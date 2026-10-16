@@ -153,3 +153,29 @@ export async function replacePaymentsFromRows(rows) {
     }));
   }
 }
+
+// Редактирует платеж. Проверяет те же правила, что и при добавлении; при ошибке бросает Error и ничего не пишет.
+export async function updatePayment(id, data) {
+  const payments = await getPayments();
+  const current = payments.find((p) => p.id === Number(id));
+  if (!current) throw new Error("Платеж не найден.");
+  const next = { ...current, ...data };
+
+  if (!next.client_id) throw new Error("Выберите клиента.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(next.date || "")) throw new Error("Дата должна быть в формате YYYY-MM-DD.");
+  const [y, m, d] = next.date.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) throw new Error("Такой даты не существует.");
+  if (!(next.amount > 0)) throw new Error("Сумма должна быть больше 0.");
+  if (!(next.commission_percent >= 0 && next.commission_percent <= 100)) throw new Error("Комиссия должна быть от 0 до 100.");
+  if (typeof next.success !== "boolean") throw new Error("Успех должен быть «Успех» или «Неуспех».");
+
+  const sameDay = payments.filter((p) => p.id !== current.id && p.client_id === next.client_id && p.date === next.date);
+  if (sameDay.length >= 20) throw new Error("Лимит: максимум 20 платежей на клиента в день.");
+  if (sameDay.some((p) => p.commission_percent !== next.commission_percent)) {
+    throw new Error("У клиента за этот день уже есть платежи с другой комиссией. Укажите такую же комиссию.");
+  }
+
+  const tr = await tx(["payments"], "readwrite");
+  await promisify(tr.objectStore("payments").put(next));
+}

@@ -58,9 +58,16 @@
         <div class="grid grid-3">
           <div><label for="reportPeriod">Период</label><select id="reportPeriod"><option value="day">День</option><option value="month">Месяц</option><option value="year">Год</option></select></div>
           <div><label for="reportValue">Значение периода</label><input id="reportValue" type="date"></div>
-          <div><label for="reportClientSelect">Клиент (персональный отчет)</label><select id="reportClientSelect"></select></div>
+          <div>
+            <label>Клиенты</label>
+            <div style="max-height:180px;overflow:auto;border:1px solid #ccc;border-radius:6px;padding:0.4rem;">
+              <label style="display:block;"><input type="checkbox" id="reportAllClients" checked> <strong>Все клиенты</strong></label>
+              <div id="reportClientsList"></div>
+            </div>
+          </div>
         </div>
-        <div class="actions" style="margin-top:0.8rem;"><button id="btnBuildReports">Построить отчеты</button></div>
+        <div class="actions" style="margin-top:0.8rem;"><button id="btnBuildReports">Построить отчет</button></div>
+        <p class="muted">Если не отмечен ни один клиент, отчет пустой.</p>
       </article>
 
       <article class="card">
@@ -74,16 +81,16 @@
       </article>
     </section>
 
-    <section class="grid grid-2" style="margin-top:1rem; margin-bottom:2rem;">
-      <article class="card">
-        <h3>Персональный отчет</h3>
-        <div class="table-wrap"><table><thead><tr><th>Клиент</th><th>Дата</th><th>Сумма</th><th>Комиссия</th><th>Итог</th></tr></thead><tbody id="personalReportBody"></tbody></table></div>
-      </article>
-      <article class="card">
-        <h3>Сводный отчет</h3>
-        <div class="table-wrap"><table><thead><tr><th>Клиент</th><th>Кол-во</th><th>Сумма</th><th>Итог</th></tr></thead><tbody id="summaryReportBody"></tbody></table></div>
-        <p class="right"><strong>Общий итог:</strong> <span id="summaryTotal">0 ₽</span></p>
-      </article>
+    <section class="card" style="margin-top:1rem;">
+      <h2>Отчет</h2>
+      <p class="muted">Значения в таблице можно менять. Изменение сохраняется сразу после Enter или выхода из поля. Если правка нарушает правила, появится ошибка и поле вернется к прежнему значению.</p>
+      <div class="table-wrap"><table><thead><tr><th>Клиент</th><th>Дата</th><th>Сумма</th><th>Комиссия (%)</th><th>Статус</th><th>Успех</th><th>Итог</th></tr></thead><tbody id="reportBody"></tbody></table></div>
+    </section>
+
+    <section class="card" style="margin-top:1rem; margin-bottom:2rem;">
+      <h3>Сводка по клиентам</h3>
+      <div class="table-wrap"><table><thead><tr><th>Клиент</th><th>Кол-во</th><th>Сумма</th><th>Итог</th></tr></thead><tbody id="summaryReportBody"></tbody></table></div>
+      <p class="right"><strong>Общий итог:</strong> <span id="summaryTotal">0 ₽</span></p>
     </section>
   </main>
 
