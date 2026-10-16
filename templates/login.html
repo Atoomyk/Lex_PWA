@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2563eb">
+  <title>Вход - LEX Payments</title>
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div id="toastHost"></div>
+  <main class="auth-layout">
+    <section class="card auth-card" id="setupCard">
+      <h2>Первичная настройка</h2>
+      <p class="muted">Создайте локальный аккаунт user.</p>
+      <label for="userPassword">Пароль user</label>
+      <input id="userPassword" type="password" autocomplete="new-password">
+      <div class="actions" style="margin-top:0.8rem;"><button id="btnSetup">Создать аккаунт</button></div>
+    </section>
+
+    <section class="card auth-card" id="loginCard">
+      <h2>Вход</h2>
+      <label for="username">Логин</label>
+      <input id="username" type="text" value="user" readonly>
+      <label for="password" style="margin-top:0.6rem;">Пароль</label>
+      <input id="password" type="password" autocomplete="current-password">
+      <div class="actions" style="margin-top:0.8rem;"><button id="btnLogin">Войти</button></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initDB } from "/static/js/db.js";
+    import { initializeAccounts, login, needsInitialSetup, getSession } from "/static/js/auth.js";
+    import { registerServiceWorker } from "/static/js/sw-register.js";
+
+    registerServiceWorker();
+
+    const setupCard = document.getElementById("setupCard");
+    const loginCard = document.getElementById("loginCard");
+    const toastHost = document.getElementById("toastHost");
+
+    function toast(msg, type = "ok") {
+      const div = document.createElement("div");
+      div.className = `toast ${type}`;
+      div.textContent = msg;
+      toastHost.appendChild(div);
+      setTimeout(() => div.remove(), 3200);
+    }
+
+    function applyTheme() {
+      document.documentElement.setAttribute("data-theme", localStorage.getItem("theme") || "light");
+    }
+
+    async function bootstrap() {
+      applyTheme();
+      await initDB();
+      const session = getSession();
+      if (session) return (window.location.href = "/");
+
+      const setup = await needsInitialSetup();
+      setupCard.classList.toggle("hidden", !setup);
+      loginCard.classList.toggle("hidden", setup);
+
+      document.getElementById("btnSetup").addEventListener("click", async () => {
+        try {
+          const userPassword = document.getElementById("userPassword").value;
+          if (userPassword.length < 4) return toast("Минимальная длина пароля: 4 символа.", "error");
+          await initializeAccounts(userPassword);
+          toast("Аккаунт user создан. Теперь войдите в систему.");
+          setupCard.classList.add("hidden");
+          loginCard.classList.remove("hidden");
+        } catch (e) { toast(e.message, "error"); }
+      });
+
+      document.getElementById("btnLogin").addEventListener("click", async () => {
+        try {
+          await login(document.getElementById("username").value, document.getElementById("password").value);
+          window.location.href = "/";
+        } catch (e) { toast(e.message, "error"); }
+      });
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>

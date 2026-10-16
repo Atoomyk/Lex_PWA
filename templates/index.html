@@ -1,0 +1,88 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2563eb">
+  <title>LEX Payments</title>
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div id="toastHost"></div>
+  <main class="container">
+    <section class="header card">
+      <div>
+        <h1>Учет платежей клиентов</h1>
+        <div class="muted">Пользователь: <span id="userBadge"></span> | Роль: <span id="roleBadge"></span></div>
+      </div>
+      <div class="actions">
+        <button id="btnTheme" class="ghost">Темная тема</button>
+        <button id="btnLogout" class="secondary">Выйти</button>
+      </div>
+    </section>
+
+    <section class="grid grid-2">
+      <article class="card">
+        <h2>Клиенты</h2>
+        <label for="clientName">Новый клиент</label>
+        <input id="clientName" type="text" placeholder="Имя клиента">
+        <div class="actions" style="margin-top:0.6rem;"><button id="btnAddClient">Добавить клиента</button></div>
+        <label for="clientsSelect" style="margin-top:0.8rem;">Выбор клиента</label>
+        <select id="clientsSelect"></select>
+        <div class="actions" style="margin-top:0.6rem;"><button id="btnDeleteClient" class="danger">Удалить клиента</button></div>
+      </article>
+
+      <article class="card">
+        <h2>Новый платеж</h2>
+        <div class="grid grid-2">
+          <div><label for="paymentClient">Клиент</label><select id="paymentClient"></select></div>
+          <div><label for="paymentDate">Дата (YYYY-MM-DD)</label><input id="paymentDate" type="date"></div>
+          <div><label for="paymentAmount">Сумма (руб.)</label><input id="paymentAmount" type="number" step="0.01" min="0.01" placeholder="1000"></div>
+          <div><label for="paymentCommission">Комиссия (%)</label><input id="paymentCommission" type="number" step="0.01" min="0" max="100" placeholder="5"></div>
+          <div><label for="paymentStatus">Статус</label><input id="paymentStatus" type="text" placeholder="Например: оплачен"></div>
+          <div><label for="paymentSuccess">Успех</label><select id="paymentSuccess"><option value="true">Успех</option><option value="false">Неуспех</option></select></div>
+        </div>
+        <div class="actions" style="margin-top:0.8rem;"><button id="btnAddPayment">Добавить платеж</button></div>
+      </article>
+    </section>
+
+    <section class="card" style="margin-top:1rem;">
+      <h2>Таблица платежей</h2>
+      <div class="table-wrap"><table><thead><tr><th>ID</th><th>Клиент</th><th>Дата</th><th>Сумма</th><th>Комиссия</th><th>Статус</th><th>Успех</th><th>Действия</th></tr></thead><tbody id="paymentsBody"></tbody></table></div>
+    </section>
+
+    <section class="grid grid-2" style="margin-top:1rem;">
+      <article class="card">
+        <h2>Отчеты</h2>
+        <div class="grid grid-3">
+          <div><label for="reportPeriod">Период</label><select id="reportPeriod"><option value="day">День</option><option value="month">Месяц</option><option value="year">Год</option></select></div>
+          <div><label for="reportValue">Значение периода</label><input id="reportValue" type="date"></div>
+          <div><label for="reportClientSelect">Клиент (персональный отчет)</label><select id="reportClientSelect"></select></div>
+        </div>
+        <div class="actions" style="margin-top:0.8rem;"><button id="btnBuildReports">Построить отчеты</button></div>
+      </article>
+
+      <article class="card">
+        <h2>Экспорт / Импорт</h2>
+        <div class="actions"><button id="btnExport">Экспорт JSON</button><input id="importFile" type="file" accept="application/json,.json"><button id="btnImport" class="secondary">Импорт JSON</button></div>
+        <p class="muted">Импорт заменяет текущие данные целиком.</p>
+      </article>
+    </section>
+
+    <section class="grid grid-2" style="margin-top:1rem; margin-bottom:2rem;">
+      <article class="card">
+        <h3>Персональный отчет</h3>
+        <div class="table-wrap"><table><thead><tr><th>Клиент</th><th>Дата</th><th>Сумма</th><th>Комиссия</th><th>Итог</th></tr></thead><tbody id="personalReportBody"></tbody></table></div>
+      </article>
+      <article class="card">
+        <h3>Сводный отчет</h3>
+        <div class="table-wrap"><table><thead><tr><th>Клиент</th><th>Кол-во</th><th>Сумма</th><th>Итог</th></tr></thead><tbody id="summaryReportBody"></tbody></table></div>
+        <p class="right"><strong>Общий итог:</strong> <span id="summaryTotal">0 ₽</span></p>
+      </article>
+    </section>
+  </main>
+
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>
