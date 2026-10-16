@@ -49,7 +49,13 @@
 
     <section class="card" style="margin-top:1rem;">
       <h2>Таблица платежей</h2>
-      <div class="table-wrap"><table><thead><tr><th>ID</th><th>Клиент</th><th>Дата</th><th>Сумма</th><th>Комиссия</th><th>Статус</th><th>Успех</th><th>Действия</th></tr></thead><tbody id="paymentsBody"></tbody></table></div>
+      <p class="muted">Значения можно менять. Изменение сохраняется после Enter или выхода из поля, проверки те же, что и при добавлении платежа.</p>
+      <div class="grid grid-3" style="margin-bottom:0.8rem;">
+        <div><label for="filterClient">Клиент</label><select id="filterClient"></select></div>
+        <div><label for="filterDate">Дата (YYYY-MM или YYYY-MM-DD)</label><input id="filterDate" type="text" placeholder="например 2024-05"></div>
+        <div class="actions" style="align-items:flex-end;"><button id="btnResetFilter" class="ghost">Сбросить фильтр</button></div>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>ID</th><th>Клиент</th><th>Дата</th><th>Сумма</th><th>Комиссия (%)</th><th>Статус</th><th>Успех</th><th>Действия</th></tr></thead><tbody id="paymentsBody"></tbody></table></div>
     </section>
 
     <section class="grid grid-2" style="margin-top:1rem;">
@@ -60,9 +66,13 @@
           <div><label for="reportValue">Значение периода</label><input id="reportValue" type="date"></div>
           <div>
             <label>Клиенты</label>
-            <div style="max-height:180px;overflow:auto;border:1px solid #ccc;border-radius:6px;padding:0.4rem;">
-              <label style="display:block;"><input type="checkbox" id="reportAllClients" checked> <strong>Все клиенты</strong></label>
-              <div id="reportClientsList"></div>
+            <div class="client-picker" id="reportClientsPicker">
+              <button type="button" id="btnReportClients" class="client-picker-btn ghost">Клиенты: все</button>
+              <div id="reportClientsPanel" class="client-picker-panel hidden">
+                <label><input type="checkbox" id="reportAllClients" checked> <strong>Все клиенты</strong></label>
+                <hr>
+                <div id="reportClientsList"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -83,7 +93,19 @@
 
     <section class="card" style="margin-top:1rem;">
       <h2>Отчет</h2>
-      <p class="muted">Значения в таблице можно менять. Изменение сохраняется сразу после Enter или выхода из поля. Если правка нарушает правила, появится ошибка и поле вернется к прежнему значению.</p>
+      <p class="muted">Отчет только для просмотра. Правка платежей делается в таблице платежей выше. Новую строку можно добавить кнопкой ниже.</p>
+      <div class="actions" style="margin-bottom:0.8rem;"><button id="btnAddReportRow" class="secondary">Добавить строку</button></div>
+      <div id="reportDraft" class="hidden" style="margin-bottom:0.8rem;">
+        <div class="grid grid-3">
+          <div><label for="draftClient">Клиент</label><input id="draftClient" type="text" list="draftClientList" placeholder="Имя клиента"><datalist id="draftClientList"></datalist></div>
+          <div><label for="draftDate">Дата</label><input id="draftDate" type="date"></div>
+          <div><label for="draftAmount">Сумма (руб.)</label><input id="draftAmount" type="number" step="0.01" min="0.01"></div>
+          <div><label for="draftCommission">Комиссия (%)</label><input id="draftCommission" type="number" step="0.01" min="0" max="100"></div>
+          <div><label for="draftStatus">Статус</label><input id="draftStatus" type="text"></div>
+          <div><label for="draftSuccess">Успех</label><select id="draftSuccess"><option value="true">Успех</option><option value="false">Неуспех</option></select></div>
+        </div>
+        <div class="actions" style="margin-top:0.6rem;"><button id="btnSaveDraft">Сохранить строку</button><button id="btnCancelDraft" class="ghost">Отмена</button></div>
+      </div>
       <div class="table-wrap"><table><thead><tr><th>Клиент</th><th>Дата</th><th>Сумма</th><th>Комиссия (%)</th><th>Статус</th><th>Успех</th><th>Итог</th></tr></thead><tbody id="reportBody"></tbody></table></div>
     </section>
 

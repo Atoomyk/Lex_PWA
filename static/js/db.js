@@ -154,14 +154,8 @@ export async function replacePaymentsFromRows(rows) {
   }
 }
 
-// Редактирует платеж. Проверяет те же правила, что и при добавлении; при ошибке бросает Error и ничего не пишет.
-export async function updatePayment(id, data) {
-  const payments = await getPayments();
-  const current = payments.find((p) => p.id === Number(id));
-  if (!current) throw new Error("Платеж не найден.");
-  const next = { ...current, ...data };
-
-  if (!next.client_id) throw new Error("Выберите клиента.");
+// Общие проверки полей платежа (клиент и правила за день проверяются отдельно). При ошибке бросает Error.
+function validatePaymentFields(next) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(next.date || "")) throw new Error("Дата должна быть в формате YYYY-MM-DD.");
   const [y, m, d] = next.date.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
@@ -169,13 +163,60 @@ export async function updatePayment(id, data) {
   if (!(next.amount > 0)) throw new Error("Сумма должна быть больше 0.");
   if (!(next.commission_percent >= 0 && next.commission_percent <= 100)) throw new Error("Комиссия должна быть от 0 до 100.");
   if (typeof next.success !== "boolean") throw new Error("Успех должен быть «Успех» или «Неуспех».");
+}
 
-  const sameDay = payments.filter((p) => p.id !== current.id && p.client_id === next.client_id && p.date === next.date);
+// Правила за день у клиента: лимит 20 и одинаковая комиссия. excludeId — редактируемый платеж, его не считаем.
+function checkDayRules(payments, next, excludeId) {
+  const sameDay = payments.filter((p) => p.id !== excludeId && p.client_id === next.client_id && p.date === next.date);
   if (sameDay.length >= 20) throw new Error("Лимит: максимум 20 платежей на клиента в день.");
   if (sameDay.some((p) => p.commission_percent !== next.commission_percent)) {
     throw new Error("У клиента за этот день уже есть платежи с другой комиссией. Укажите такую же комиссию.");
   }
+}
 
+// Редактирует платеж. Проверяет те же правила, что и при добавлении; при ошибке бросает Error и ничего не пишет.
+export async function updatePayment(id, data) {
+  const payments = await getPayments();
+  const current = payments.find((p) => p.id === Number(id));
+  if (!current) throw new Error("Платеж не найден.");
+  const next = { ...current, ...data };
+  if (!next.client_id) throw new Error("Выберите клиента.");
+  validatePaymentFields(next);
+  checkDayRules(payments, next, current.id);
   const tr = await tx(["payments"], "readwrite");
   await promisify(tr.objectStore("payments").put(next));
+}
+
+// Создаёт платёж из строки отчёта. Клиент ищется по имени без учёта регистра, если его нет — создаётся.
+// Все проверки выполняются до записи; запись идёт одной транзакцией, поэтому при ошибке ничего не появляется.
+export async function createPaymentFromDraft(draft) {
+  const name = String(draft?.client_name ?? "").trim();
+  if (!name) throw new Error("Введите имя клиента.");
+  const payments = await getPayments();
+  const clients = await getClients();
+  const existing = clients.find((c) => c.name.toLowerCase() === name.toLowerCase());
+  const next = {
+    client_id: existing ? existing.id : 0,
+    date: draft.date,
+    amount: draft.amount,
+    commission_percent: draft.commission_percent,
+    status: String(draft.status ?? "").trim(),
+    success: draft.success
+  };
+  validatePaymentFields(next);
+  checkDayRules(payments, next);
+
+  const tr = await tx(["clients", "payments"], "readwrite");
+  const clientsStore = tr.objectStore("clients");
+  const paymentsStore = tr.objectStore("payments");
+  const clientId = existing ? existing.id : await promisify(clientsStore.add({ name }));
+  const id = await promisify(paymentsStore.add({
+    client_id: clientId,
+    date: next.date,
+    amount: next.amount,
+    commission_percent: next.commission_percent,
+    status: next.status,
+    success: next.success
+  }));
+  return { id, client_id: clientId, clientCreated: !existing };
 }

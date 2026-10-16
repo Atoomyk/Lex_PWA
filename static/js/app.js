@@ -1,4 +1,4 @@
-import { addClient, addPayment, deleteClient, deletePayment, getClients, getPayments, getPaymentsByClientDate, updatePayment } from "./db.js";
+import { addClient, addPayment, createPaymentFromDraft, deleteClient, deletePayment, getClients, getPayments, getPaymentsByClientDate, updatePayment } from "./db.js";
 import { requireAuth, logout } from "./auth.js";
 import { buildReports } from "./reports.js";
 import { exportJSON, importJSONFile } from "./export_import.js";
@@ -16,8 +16,14 @@ const el = {
   btnAddClient: document.getElementById("btnAddClient"), btnDeleteClient: document.getElementById("btnDeleteClient"), paymentClient: document.getElementById("paymentClient"),
   paymentDate: document.getElementById("paymentDate"), paymentAmount: document.getElementById("paymentAmount"), paymentCommission: document.getElementById("paymentCommission"),
   paymentStatus: document.getElementById("paymentStatus"), paymentSuccess: document.getElementById("paymentSuccess"), btnAddPayment: document.getElementById("btnAddPayment"),
-  paymentsBody: document.getElementById("paymentsBody"), reportPeriod: document.getElementById("reportPeriod"), reportValue: document.getElementById("reportValue"),
+  paymentsBody: document.getElementById("paymentsBody"), filterClient: document.getElementById("filterClient"), filterDate: document.getElementById("filterDate"),
+  btnResetFilter: document.getElementById("btnResetFilter"), reportPeriod: document.getElementById("reportPeriod"), reportValue: document.getElementById("reportValue"),
   btnBuildReports: document.getElementById("btnBuildReports"), reportAllClients: document.getElementById("reportAllClients"), reportClientsList: document.getElementById("reportClientsList"),
+  reportClientsPicker: document.getElementById("reportClientsPicker"), btnReportClients: document.getElementById("btnReportClients"), reportClientsPanel: document.getElementById("reportClientsPanel"),
+  btnAddReportRow: document.getElementById("btnAddReportRow"), reportDraft: document.getElementById("reportDraft"), draftClient: document.getElementById("draftClient"),
+  draftClientList: document.getElementById("draftClientList"), draftDate: document.getElementById("draftDate"), draftAmount: document.getElementById("draftAmount"),
+  draftCommission: document.getElementById("draftCommission"), draftStatus: document.getElementById("draftStatus"), draftSuccess: document.getElementById("draftSuccess"),
+  btnSaveDraft: document.getElementById("btnSaveDraft"), btnCancelDraft: document.getElementById("btnCancelDraft"),
   reportBody: document.getElementById("reportBody"), summaryReportBody: document.getElementById("summaryReportBody"),
   summaryTotal: document.getElementById("summaryTotal"), btnExport: document.getElementById("btnExport"), btnImport: document.getElementById("btnImport"),
   importFile: document.getElementById("importFile"), toastHost: document.getElementById("toastHost"),
@@ -52,17 +58,28 @@ async function refreshClients() {
   allClients = await getClients();
   const options = allClients.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
   [el.clientsSelect, el.paymentClient].forEach((select) => { select.innerHTML = `<option value="">-- выбрать --</option>${options}`; });
+  el.draftClientList.innerHTML = allClients.map((c) => `<option value="${esc(c.name)}"></option>`).join("");
+  const prevFilter = el.filterClient.value;
+  el.filterClient.innerHTML = `<option value="">Все клиенты</option>${options}`;
+  el.filterClient.value = prevFilter;
   renderReportClients();
 }
 
-// Список клиентов с галочками. Уже известные клиенты сохраняют свою галочку, новые отмечаются.
+// Список клиентов в выпадающем окне с галочками. Уже известные клиенты сохраняют свою галочку, новые отмечаются.
 function renderReportClients() {
   const prev = new Map([...el.reportClientsList.querySelectorAll("input.rep-client")].map((i) => [Number(i.value), i.checked]));
   el.reportClientsList.innerHTML = allClients.map((c) => {
     const checked = prev.has(c.id) ? prev.get(c.id) : true;
-    return `<label style="display:block;"><input type="checkbox" class="rep-client" value="${c.id}" ${checked ? "checked" : ""}> ${esc(c.name)}</label>`;
+    return `<label><input type="checkbox" class="rep-client" value="${c.id}" ${checked ? "checked" : ""}> ${esc(c.name)}</label>`;
   }).join("") || '<span class="muted">Клиентов нет</span>';
   syncAllCheckbox();
+}
+
+function updateClientsButton() {
+  const boxes = [...el.reportClientsList.querySelectorAll("input.rep-client")];
+  const total = boxes.length;
+  const checked = boxes.filter((b) => b.checked).length;
+  el.btnReportClients.textContent = checked === total ? `Клиенты: все (${total})` : `Клиенты: выбрано ${checked} из ${total}`;
 }
 
 function syncAllCheckbox() {
@@ -70,21 +87,40 @@ function syncAllCheckbox() {
   const checkedCount = boxes.filter((b) => b.checked).length;
   el.reportAllClients.checked = boxes.length > 0 && checkedCount === boxes.length;
   el.reportAllClients.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
+  updateClientsButton();
 }
 
 function toggleAllClients() {
   const on = el.reportAllClients.checked;
   el.reportClientsList.querySelectorAll("input.rep-client").forEach((b) => { b.checked = on; });
   el.reportAllClients.indeterminate = false;
+  updateClientsButton();
 }
 
+// Строка таблицы платежей с редактируемыми полями (ID и удаление — без правок).
+function renderPaymentRow(p, clients) {
+  const clientOptions = clients.map((c) => `<option value="${c.id}" ${c.id === p.client_id ? "selected" : ""}>${esc(c.name)}</option>`).join("");
+  return `<tr data-id="${p.id}">
+    <td>${p.id}</td>
+    <td><select data-field="client_id">${clientOptions}</select></td>
+    <td><input type="date" data-field="date" value="${esc(p.date)}"></td>
+    <td><input type="number" step="0.01" min="0.01" data-field="amount" value="${esc(p.amount)}"></td>
+    <td><input type="number" step="0.01" min="0" max="100" data-field="commission_percent" value="${esc(p.commission_percent)}"></td>
+    <td><input type="text" data-field="status" value="${esc(p.status || "")}"></td>
+    <td><select data-field="success"><option value="true" ${p.success ? "selected" : ""}>Успех</option><option value="false" ${p.success ? "" : "selected"}>Неуспех</option></select></td>
+    <td><button data-del="${p.id}" class="danger">Удалить</button></td>
+  </tr>`;
+}
+
+// Таблица платежей с учётом фильтра по клиенту и дате (дата: начало YYYY-MM или YYYY-MM-DD).
 async function refreshPaymentsTable() {
   const [payments, clients] = await Promise.all([getPayments(), getClients()]);
-  const nameById = new Map(clients.map((c) => [c.id, c.name]));
-  el.paymentsBody.innerHTML = payments.map((p) => {
-    const deleteBtn = `<button data-del="${p.id}" class="danger">Удалить</button>`;
-    return `<tr><td>${p.id}</td><td>${esc(nameById.get(p.client_id) || "Unknown")}</td><td>${p.date}</td><td>${rub.format(p.amount)}</td><td>${p.commission_percent}%</td><td>${esc(p.status || "")}</td><td><span class="badge ${p.success ? "ok" : "fail"}">${p.success ? "Успех" : "Неуспех"}</span></td><td>${deleteBtn}</td></tr>`;
-  }).join("");
+  const clientFilter = el.filterClient.value;
+  const dateFilter = el.filterDate.value.trim();
+  const visible = payments.filter((p) =>
+    (!clientFilter || String(p.client_id) === clientFilter) && (!dateFilter || p.date.startsWith(dateFilter)));
+  el.paymentsBody.innerHTML = visible.map((p) => renderPaymentRow(p, clients)).join("")
+    || '<tr><td colspan="8" class="muted">Нет платежей</td></tr>';
 }
 
 async function syncCommissionForClientDate() {
@@ -159,17 +195,9 @@ function updatePeriodInput() {
   el.reportValue.value = periodValueByType(type);
 }
 
+// Строка отчёта только для просмотра.
 function renderReportRow(r) {
-  const clientOptions = allClients.map((c) => `<option value="${c.id}" ${c.id === r.client_id ? "selected" : ""}>${esc(c.name)}</option>`).join("");
-  return `<tr data-id="${r.id}">
-    <td><select data-field="client_id">${clientOptions}</select></td>
-    <td><input type="date" data-field="date" value="${esc(r.date)}"></td>
-    <td><input type="number" step="0.01" min="0.01" data-field="amount" value="${esc(r.amount)}"></td>
-    <td><input type="number" step="0.01" min="0" max="100" data-field="commission_percent" value="${esc(r.commission_percent)}"></td>
-    <td><input type="text" data-field="status" value="${esc(r.status)}"></td>
-    <td><select data-field="success"><option value="true" ${r.success ? "selected" : ""}>Успех</option><option value="false" ${r.success ? "" : "selected"}>Неуспех</option></select></td>
-    <td>${rub.format(r.net)}</td>
-  </tr>`;
+  return `<tr data-id="${r.id}"><td>${esc(r.client_name)}</td><td>${esc(r.date)}</td><td>${rub.format(r.amount)}</td><td>${r.commission_percent}%</td><td>${esc(r.status || "")}</td><td><span class="badge ${r.success ? "ok" : "fail"}">${r.success ? "Успех" : "Неуспех"}</span></td><td>${rub.format(r.net)}</td></tr>`;
 }
 
 async function handleBuildReports() {
@@ -187,8 +215,8 @@ async function handleBuildReports() {
   el.summaryTotal.textContent = rub.format(data.grandTotalNet);
 }
 
-// Сохранение правки в строке отчёта. Ошибка -> сообщение, поле возвращается к прежнему значению.
-async function handleReportEdit(event) {
+// Сохранение правки в таблице платежей. Ошибка -> сообщение; таблица перерисовывается, поле возвращается к прежнему значению.
+async function handlePaymentEdit(event) {
   const input = event.target;
   const field = input.dataset.field;
   const row = input.closest("tr");
@@ -205,6 +233,7 @@ async function handleReportEdit(event) {
   };
   if (!makePatch[field]) return;
 
+  const filterActive = Boolean(el.filterClient.value || el.filterDate.value.trim());
   let saved = false;
   try {
     await updatePayment(id, makePatch[field]());
@@ -215,9 +244,42 @@ async function handleReportEdit(event) {
   }
   await refreshPaymentsTable();
   await handleBuildReports();
-  if (saved && !el.reportBody.querySelector(`tr[data-id="${id}"]`)) {
-    toast("Платеж сохранен, но он больше не входит в этот отчет.", "ok");
+  if (saved && filterActive && !el.paymentsBody.querySelector(`tr[data-id="${id}"]`)) {
+    toast("Платеж сохранен, но он скрыт фильтром.", "ok");
   }
+}
+
+const toNumberOrNaN = (raw) => (String(raw).trim() === "" ? NaN : Number(raw));
+
+// Сохранение строки, добавленной вручную в отчёт. Ошибка -> сообщение, строка остаётся для исправления.
+async function handleSaveReportDraft() {
+  const draft = {
+    client_name: el.draftClient.value,
+    date: el.draftDate.value,
+    amount: toNumberOrNaN(el.draftAmount.value),
+    commission_percent: toNumberOrNaN(el.draftCommission.value),
+    status: el.draftStatus.value,
+    success: el.draftSuccess.value === "true"
+  };
+  let saved;
+  try {
+    saved = await createPaymentFromDraft(draft);
+  } catch (e) {
+    toast(e.message, "error");
+    return;
+  }
+  el.draftAmount.value = "";
+  el.draftStatus.value = "";
+  await refreshClients();
+  await refreshPaymentsTable();
+  await handleBuildReports();
+  if (el.reportBody.querySelector(`tr[data-id="${saved.id}"]`)) toast("Платеж добавлен.");
+  else toast("Платеж сохранен, но не входит в этот отчёт.", "ok");
+}
+
+function toggleReportDraft() {
+  el.reportDraft.classList.toggle("hidden");
+  if (!el.draftDate.value) el.draftDate.value = new Date().toISOString().slice(0, 10);
 }
 
 async function handleExport() { await exportJSON(); toast("Экспорт выполнен."); }
@@ -273,7 +335,21 @@ function bindEvents() {
   el.btnBuildReports.addEventListener("click", handleBuildReports);
   el.reportAllClients.addEventListener("change", toggleAllClients);
   el.reportClientsList.addEventListener("change", syncAllCheckbox);
-  el.reportBody.addEventListener("change", handleReportEdit);
+  el.btnReportClients.addEventListener("click", () => el.reportClientsPanel.classList.toggle("hidden"));
+  document.addEventListener("click", (e) => {
+    if (!el.reportClientsPicker.contains(e.target)) el.reportClientsPanel.classList.add("hidden");
+  });
+  el.btnAddReportRow.addEventListener("click", toggleReportDraft);
+  el.btnSaveDraft.addEventListener("click", handleSaveReportDraft);
+  el.btnCancelDraft.addEventListener("click", () => el.reportDraft.classList.add("hidden"));
+  el.paymentsBody.addEventListener("change", handlePaymentEdit);
+  el.filterClient.addEventListener("change", () => refreshPaymentsTable());
+  el.filterDate.addEventListener("input", () => refreshPaymentsTable());
+  el.btnResetFilter.addEventListener("click", () => {
+    el.filterClient.value = "";
+    el.filterDate.value = "";
+    refreshPaymentsTable();
+  });
   el.paymentClient.addEventListener("change", syncCommissionForClientDate);
   el.paymentDate.addEventListener("change", syncCommissionForClientDate);
   el.btnExport.addEventListener("click", handleExport);
