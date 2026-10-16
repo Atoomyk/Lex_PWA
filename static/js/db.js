@@ -126,3 +126,30 @@ export async function importAll(payload) {
   for (const u of payload.users) await promisify(usersStore.add(u));
   await promisify(metaStore.put({ key: "setup_done", value: Boolean(payload.meta.setup_done) }));
 }
+
+// Заменяет все платежи; клиентов из файла, которых нет в базе, создаёт (сравнение имён без учёта регистра)
+export async function replacePaymentsFromRows(rows) {
+  const tr = await tx(["clients", "payments"], "readwrite");
+  const clientsStore = tr.objectStore("clients");
+  const paymentsStore = tr.objectStore("payments");
+  const existing = await promisify(clientsStore.getAll());
+  const idByName = new Map(existing.map((c) => [c.name.toLowerCase(), c.id]));
+  for (const r of rows) {
+    const key = r.clientName.toLowerCase();
+    if (!idByName.has(key)) {
+      const id = await promisify(clientsStore.add({ name: r.clientName }));
+      idByName.set(key, id);
+    }
+  }
+  await promisify(paymentsStore.clear());
+  for (const r of rows) {
+    await promisify(paymentsStore.add({
+      client_id: idByName.get(r.clientName.toLowerCase()),
+      date: r.date,
+      amount: r.amount,
+      commission_percent: r.commission,
+      status: r.status,
+      success: r.success
+    }));
+  }
+}

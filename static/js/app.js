@@ -2,6 +2,7 @@ import { addClient, addPayment, deleteClient, deletePayment, getClients, getPaym
 import { requireAuth, logout } from "./auth.js";
 import { buildReports } from "./reports.js";
 import { exportJSON, importJSONFile } from "./export_import.js";
+import { exportPaymentsCSV, importPaymentsCSV } from "./csv.js";
 import { registerServiceWorker } from "./sw-register.js";
 
 registerServiceWorker();
@@ -17,7 +18,9 @@ const el = {
   paymentsBody: document.getElementById("paymentsBody"), reportPeriod: document.getElementById("reportPeriod"), reportValue: document.getElementById("reportValue"),
   btnBuildReports: document.getElementById("btnBuildReports"), personalReportBody: document.getElementById("personalReportBody"), summaryReportBody: document.getElementById("summaryReportBody"),
   summaryTotal: document.getElementById("summaryTotal"), btnExport: document.getElementById("btnExport"), btnImport: document.getElementById("btnImport"),
-  importFile: document.getElementById("importFile"), toastHost: document.getElementById("toastHost")
+  importFile: document.getElementById("importFile"), toastHost: document.getElementById("toastHost"),
+  btnExportCsv: document.getElementById("btnExportCsv"), btnImportCsv: document.getElementById("btnImportCsv"),
+  csvFile: document.getElementById("csvFile"), importErrors: document.getElementById("importErrors")
 };
 
 function toast(msg, type = "ok") {
@@ -154,6 +157,30 @@ async function handleImport() {
   } catch (e) { toast(e.message, "error"); }
 }
 
+async function handleExportCsv() {
+  const count = await exportPaymentsCSV();
+  toast(`CSV сохранен, платежей: ${count}.`);
+}
+
+async function handleImportCsv() {
+  const file = el.csvFile.files[0];
+  el.importErrors.innerHTML = "";
+  if (!file) return toast("Выберите CSV файл.", "error");
+  if (!confirm("Импорт заменит все платежи данными из CSV. Продолжить?")) return;
+  try {
+    const count = await importPaymentsCSV(file);
+    await refreshClients(); await refreshPaymentsTable(); await handleBuildReports();
+    toast(`Импорт CSV завершен, платежей: ${count}.`);
+  } catch (e) {
+    toast(e.message, "error");
+    if (e.details) {
+      const ul = document.createElement("ul");
+      e.details.slice(0, 50).forEach((d) => { const li = document.createElement("li"); li.textContent = d; ul.appendChild(li); });
+      el.importErrors.appendChild(ul);
+    }
+  }
+}
+
 function applyRoleRestrictions() {
   el.roleBadge.textContent = session.role;
   el.userBadge.textContent = session.username;
@@ -172,6 +199,8 @@ function bindEvents() {
   el.paymentDate.addEventListener("change", syncCommissionForClientDate);
   el.btnExport.addEventListener("click", handleExport);
   el.btnImport.addEventListener("click", handleImport);
+  el.btnExportCsv.addEventListener("click", handleExportCsv);
+  el.btnImportCsv.addEventListener("click", handleImportCsv);
 }
 
 async function bootstrap() {

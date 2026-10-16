@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v1.0.1";
+const CACHE_VERSION = "v1.0.2";
 const CACHE_NAME = `payments-pwa-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -10,6 +10,7 @@ const APP_SHELL = [
   "/static/js/auth.js",
   "/static/js/reports.js",
   "/static/js/export_import.js",
+  "/static/js/csv.js",
   "/static/js/sw-register.js",
   "/static/manifest.webmanifest",
   "/static/icons/icon-192.png",

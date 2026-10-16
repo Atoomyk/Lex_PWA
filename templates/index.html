@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
@@ -67,6 +67,10 @@
         <h2>Экспорт / Импорт</h2>
         <div class="actions"><button id="btnExport">Экспорт JSON</button><input id="importFile" type="file" accept="application/json,.json"><button id="btnImport" class="secondary">Импорт JSON</button></div>
         <p class="muted">Импорт заменяет текущие данные целиком.</p>
+        <h3>CSV для Excel (платежи)</h3>
+        <div class="actions"><button id="btnExportCsv">Экспорт CSV</button><input id="csvFile" type="file" accept=".csv,text/csv"><button id="btnImportCsv" class="secondary">Импорт CSV</button></div>
+        <p class="muted">Импорт CSV заменяет все платежи. Клиенты из файла, которых нет в базе, создаются автоматически. Если есть ошибки, импорт отменяется и список ошибок показан ниже.</p>
+        <div id="importErrors"></div>
       </article>
     </section>
 
